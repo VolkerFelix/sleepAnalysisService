@@ -1,5 +1,6 @@
 import math
 import random
+import uuid
 from datetime import datetime, timedelta
 
 from app.models.sleep import SensorType, SleepData, SleepSample
@@ -10,7 +11,7 @@ def create_test_sleep_data(
 ):
     """Generate synthetic sleep data for testing."""
     samples = []
-    now = datetime.now()
+    now = datetime.utcnow()
     start_time = now - timedelta(hours=duration_hours)
 
     # Total samples
@@ -36,21 +37,21 @@ def create_test_sleep_data(
                 cycle_progress < 0.1
             ):  # Initial falling asleep or transitioning between cycles
                 movement_intensity = 0.2 + 0.15 * random.random()  # Moderate movement
-                70 + 10 * random.random()  # Slightly elevated HR
+                hr = 70 + 10 * random.random()  # Slightly elevated HR
                 is_awake = i < (20 * 60 * sampling_rate)  # Awake only in first 20 min
             elif cycle_progress < 0.4:  # Light sleep
                 movement_intensity = 0.1 + 0.1 * random.random()
-                65 + 8 * random.random()
+                hr = 65 + 8 * random.random()
                 is_awake = False
-            elif cycle_progress < 0.7:  # Deep sleep
-                movement_intensity = 0.05 + 0.05 * random.random()  # Very low movement
-                55 + 5 * random.random()  # Lower HR
+            elif cycle_progress < 0.7:  # Deep sleep - make very distinct
+                movement_intensity = 0.05 + 0.03 * random.random()  # Very low movement
+                hr = 55 + 3 * random.random()  # Lower HR with less variability
                 is_awake = False
             else:  # REM sleep
                 movement_intensity = (
                     0.1 + 0.15 * random.random()
                 )  # More variable movement
-                65 + 15 * random.random()  # More variable HR
+                hr = 65 + 15 * random.random()  # More variable HR
                 is_awake = False
 
             # Add some brief awakenings
@@ -59,58 +60,58 @@ def create_test_sleep_data(
             ):  # 0.02% chance after first hour
                 is_awake = True
                 movement_intensity = 0.3 + 0.2 * random.random()
-                75 + 15 * random.random()
+                hr = 75 + 15 * random.random()
 
         elif quality == "poor":
             # Poor sleep has fragmented patterns and more movement
             if cycle_progress < 0.2:  # More time falling asleep or transitioning
                 movement_intensity = 0.3 + 0.2 * random.random()
-                75 + 15 * random.random()
+                hr = 75 + 15 * random.random()
                 is_awake = (
                     i < (45 * 60 * sampling_rate) or random.random() < 0.3
                 )  # Awake more often
             elif cycle_progress < 0.6:  # More light sleep, less deep
                 movement_intensity = 0.15 + 0.15 * random.random()
-                70 + 10 * random.random()
+                hr = 70 + 10 * random.random()
                 is_awake = random.random() < 0.05  # Occasional awakening
             elif cycle_progress < 0.75:  # Less deep sleep
                 movement_intensity = 0.1 + 0.1 * random.random()
-                60 + 8 * random.random()
+                hr = 60 + 8 * random.random()
                 is_awake = random.random() < 0.01  # Rare awakening during deep sleep
             else:  # REM sleep
                 movement_intensity = 0.15 + 0.2 * random.random()
-                70 + 15 * random.random()
+                hr = 70 + 15 * random.random()
                 is_awake = random.random() < 0.1  # More likely to wake from REM
 
             # Add more frequent awakenings
             if random.random() < 0.001:  # 0.1% chance
                 is_awake = True
                 movement_intensity = 0.4 + 0.3 * random.random()
-                80 + 15 * random.random()
+                hr = 80 + 15 * random.random()
 
         else:  # Default moderate quality
             if cycle_progress < 0.15:
                 movement_intensity = 0.25 + 0.15 * random.random()
-                72 + 10 * random.random()
+                hr = 72 + 10 * random.random()
                 is_awake = i < (30 * 60 * sampling_rate)
             elif cycle_progress < 0.5:
                 movement_intensity = 0.12 + 0.12 * random.random()
-                68 + 8 * random.random()
+                hr = 68 + 8 * random.random()
                 is_awake = False
             elif cycle_progress < 0.7:
                 movement_intensity = 0.08 + 0.07 * random.random()
-                58 + 7 * random.random()
+                hr = 58 + 7 * random.random()
                 is_awake = False
             else:
                 movement_intensity = 0.12 + 0.18 * random.random()
-                68 + 12 * random.random()
+                hr = 68 + 12 * random.random()
                 is_awake = False
 
             # Occasional awakening
             if random.random() < 0.0005:
                 is_awake = True
                 movement_intensity = 0.35 + 0.25 * random.random()
-                78 + 12 * random.random()
+                hr = 78 + 12 * random.random()
 
         # Calculate accelerometer values
         # Base values (gravity is approximately 1g in normalized device values)
@@ -133,22 +134,47 @@ def create_test_sleep_data(
                 + movement_intensity * (random.random() - 0.5)
             )
 
-        # Add accelerometer sample
-        if i % 5 == 0:  # Reduce sample frequency for readability
+        # Add accelerometer sample - reduce frequency for performance
+        if i % 50 == 0:  # Every 50 iterations (reduced from original)
             acc_sample = SleepSample(
                 timestamp=timestamp,
                 sensor_type=SensorType.ACCELEROMETER,
-                values={"x": x, "y": y, "z": z},
+                values={
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "movement_intensity": movement_intensity,
+                },
             )
             samples.append(acc_sample)
 
-    # Create sleep data object
-    sleep_data = SleepData(
-        data_type="sleep_data",
-        device_info={"device_id": "test_device"},
+        # Add heart rate sample at a lower frequency
+        if i % 300 == 0:  # One HR sample every 5 minutes
+            hr_sample = SleepSample(
+                timestamp=timestamp,
+                sensor_type=SensorType.HEART_RATE,
+                values={"bpm": hr},
+            )
+            samples.append(hr_sample)
+
+            # Also add a respiration sample
+            resp_rate = 12 + 4 * random.random()
+            if is_awake:
+                resp_rate += 2  # Slightly higher respiration when awake
+
+            resp_sample = SleepSample(
+                timestamp=timestamp,
+                sensor_type=SensorType.RESPIRATION,
+                values={"rate": resp_rate},
+            )
+            samples.append(resp_sample)
+
+    return SleepData(
+        data_type="sleep_monitoring",
+        device_info={"device_type": "test", "model": "integration-test"},
         sampling_rate_hz=sampling_rate,
         start_time=start_time,
+        end_time=now,
         samples=samples,
+        id=f"test-data-{uuid.uuid4()}",
     )
-
-    return sleep_data

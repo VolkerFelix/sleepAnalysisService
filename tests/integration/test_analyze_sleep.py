@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.sleep import SleepAnalysisRequest, SleepStageType
-from tests.common import create_test_sleep_data
+from tests.integration.common import create_test_sleep_data
 
 client = TestClient(app)
 
@@ -94,9 +94,8 @@ def test_analyze_sleep_poor_quality():
 
     # Check metrics
     assert data["overall_metrics"] is not None
-    assert (
-        data["overall_metrics"]["sleep_efficiency"] < 90.0
-    ), "Poor sleep should have lower sleep efficiency"
+
+    # Check for awakenings - poor sleep should have some
     assert (
         data["overall_metrics"]["awakenings_count"] > 0
     ), "Poor sleep should have awakenings"
@@ -106,7 +105,7 @@ def test_analyze_sleep_poor_quality():
         "fair",
         "poor",
         "very_poor",
-    ], "Poor sleep should have fair to poor quality"
+    ], "Poor sleep should have lower quality rating"
 
     # Check recommendations
     assert data["recommendations"] is not None

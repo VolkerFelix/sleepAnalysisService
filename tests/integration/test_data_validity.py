@@ -18,14 +18,17 @@ def create_valid_sleep_data():
     now = datetime.utcnow()
     start_time = now - timedelta(hours=8)  # 8 hours of sleep
 
-    # Create samples at 1-minute intervals
-    for i in range(480):  # 480 minutes = 8 hours
-        timestamp = start_time + timedelta(minutes=i)
+    # Set a much lower sampling rate to match our actual sample generation frequency
+    sampling_rate_hz = 1 / 300  # 1 sample per 5 minutes instead of 1 per minute
+
+    # Create samples at intervals matching our declared sampling rate
+    for i in range(96):  # 96 five-minute intervals in 8 hours
+        timestamp = start_time + timedelta(minutes=i * 5)
 
         # Add accelerometer data
-        x = 0.1 * math.sin(i / 20) + 0.05 * (random.random() - 0.5)
-        y = 0.1 * math.cos(i / 25) + 0.05 * (random.random() - 0.5)
-        z = 0.95 + 0.05 * math.sin(i / 30) + 0.05 * (random.random() - 0.5)
+        x = 0.1 * math.sin(i / 4) + 0.05 * (random.random() - 0.5)
+        y = 0.1 * math.cos(i / 5) + 0.05 * (random.random() - 0.5)
+        z = 0.95 + 0.05 * math.sin(i / 6) + 0.05 * (random.random() - 0.5)
 
         acc_sample = SleepSample(
             timestamp=timestamp,
@@ -34,9 +37,9 @@ def create_valid_sleep_data():
         )
         samples.append(acc_sample)
 
-        # Add heart rate data
-        if i % 5 == 0:  # Every 5 minutes
-            hr = 60 + 10 * math.sin(i / 90) + 5 * random.random()
+        # Add heart rate data every 15 minutes (every 3rd iteration)
+        if i % 3 == 0:
+            hr = 60 + 10 * math.sin(i / 18) + 5 * random.random()
             hr_sample = SleepSample(
                 timestamp=timestamp,
                 sensor_type=SensorType.HEART_RATE,
@@ -44,10 +47,19 @@ def create_valid_sleep_data():
             )
             samples.append(hr_sample)
 
+            # Also add respiration data
+            resp_rate = 12 + 4 * random.random()
+            resp_sample = SleepSample(
+                timestamp=timestamp,
+                sensor_type=SensorType.RESPIRATION,
+                values={"rate": resp_rate},
+            )
+            samples.append(resp_sample)
+
     return SleepData(
         data_type="sleep_monitoring",
         device_info={"device_type": "test", "model": "test-device"},
-        sampling_rate_hz=1 / 60,  # 1 sample per minute
+        sampling_rate_hz=sampling_rate_hz,  # 1 sample per 5 minutes
         start_time=start_time,
         end_time=now,
         samples=samples,
@@ -63,40 +75,72 @@ def create_invalid_sleep_data(issue="short_duration"):
     if issue == "short_duration":
         start_time = now - timedelta(minutes=15)  # Only 15 minutes
         duration_minutes = 15
+        sampling_rate_hz = 1 / 60  # 1 sample per minute
     elif issue == "sparse_data":
         start_time = now - timedelta(hours=8)
         duration_minutes = 480
+        sampling_rate_hz = 1 / 60  # 1 sample per minute, but we'll generate far fewer
     elif issue == "missing_sensors":
         start_time = now - timedelta(hours=8)
         duration_minutes = 480
+        sampling_rate_hz = 1 / 300  # 1 sample per 5 minutes
     else:
         start_time = now - timedelta(hours=1)  # Default 1 hour
         duration_minutes = 60
+        sampling_rate_hz = 1 / 60
 
     # Create samples based on the issue
-    for i in range(duration_minutes):
-        timestamp = start_time + timedelta(minutes=i)
+    if issue == "short_duration":
+        # Create sufficient samples for the short duration
+        for i in range(duration_minutes):
+            timestamp = start_time + timedelta(minutes=i)
 
-        # For sparse data, only add samples occasionally
-        if issue == "sparse_data" and i % 30 != 0:
-            continue
+            # Add accelerometer data
+            acc_sample = SleepSample(
+                timestamp=timestamp,
+                sensor_type=SensorType.ACCELEROMETER,
+                values={
+                    "x": 0.1 * math.sin(i / 4) + 0.05 * (random.random() - 0.5),
+                    "y": 0.1 * math.cos(i / 5) + 0.05 * (random.random() - 0.5),
+                    "z": 0.95 + 0.05 * math.sin(i / 6) + 0.05 * (random.random() - 0.5),
+                },
+            )
+            samples.append(acc_sample)
 
-        # For missing sensors, don't add accelerometer data
-        if issue != "missing_sensors":
-            x = 0.1 * math.sin(i / 20) + 0.05 * (random.random() - 0.5)
-            y = 0.1 * math.cos(i / 25) + 0.05 * (random.random() - 0.5)
-            z = 0.95 + 0.05 * math.sin(i / 30) + 0.05 * (random.random() - 0.5)
+            # Add heart rate occasionally
+            if i % 5 == 0:
+                hr = 60 + 10 * math.sin(i / 10) + 5 * random.random()
+                hr_sample = SleepSample(
+                    timestamp=timestamp,
+                    sensor_type=SensorType.HEART_RATE,
+                    values={"bpm": hr},
+                )
+                samples.append(hr_sample)
+
+    elif issue == "sparse_data":
+        # Create very few samples over the full duration
+        for i in range(0, duration_minutes, 60):  # Only 1 sample per hour
+            timestamp = start_time + timedelta(minutes=i)
 
             acc_sample = SleepSample(
                 timestamp=timestamp,
                 sensor_type=SensorType.ACCELEROMETER,
-                values={"x": x, "y": y, "z": z},
+                values={
+                    "x": 0.1 * math.sin(i / 60) + 0.05 * (random.random() - 0.5),
+                    "y": 0.1 * math.cos(i / 60) + 0.05 * (random.random() - 0.5),
+                    "z": 0.95
+                    + 0.05 * math.sin(i / 60)
+                    + 0.05 * (random.random() - 0.5),
+                },
             )
             samples.append(acc_sample)
 
-        # Add heart rate occasionally
-        if i % 10 == 0:
-            hr = 60 + 10 * math.sin(i / 90) + 5 * random.random()
+    elif issue == "missing_sensors":
+        # Create data with only heart rate, no accelerometer
+        for i in range(0, duration_minutes, 5):  # Every 5 minutes
+            timestamp = start_time + timedelta(minutes=i)
+
+            hr = 60 + 10 * math.sin(i / 30) + 5 * random.random()
             hr_sample = SleepSample(
                 timestamp=timestamp,
                 sensor_type=SensorType.HEART_RATE,
@@ -104,10 +148,26 @@ def create_invalid_sleep_data(issue="short_duration"):
             )
             samples.append(hr_sample)
 
+    else:
+        # Default invalid data
+        for i in range(0, duration_minutes, 10):  # Every 10 minutes
+            timestamp = start_time + timedelta(minutes=i)
+
+            acc_sample = SleepSample(
+                timestamp=timestamp,
+                sensor_type=SensorType.ACCELEROMETER,
+                values={
+                    "x": 0.1 * (random.random() - 0.5),
+                    "y": 0.1 * (random.random() - 0.5),
+                    "z": 1.0 + 0.1 * (random.random() - 0.5),
+                },
+            )
+            samples.append(acc_sample)
+
     return SleepData(
         data_type="sleep_monitoring",
         device_info={"device_type": "test", "model": "test-device"},
-        sampling_rate_hz=1 / 60,  # 1 sample per minute
+        sampling_rate_hz=sampling_rate_hz,
         start_time=start_time,
         end_time=now,
         samples=samples,
@@ -124,6 +184,9 @@ def test_valid_data():
 
     # Call the validation endpoint
     response = client.post("/api/validate", json=data_dict)
+
+    # Print response for debugging
+    print(f"Validation response: {response.json()}")
 
     # Check response
     assert response.status_code == 200
@@ -185,24 +248,7 @@ def test_missing_sensor_data():
     assert response.status_code == 200
     result = response.json()
 
-    # Either it's invalid due to missing accelerometer, or we have other issues
-    if result["valid"] is False:
-        assert "sensor" in result["reason"].lower(), "Reason should mention sensor data"
-    else:
-        # If it passes despite missing accelerometer, verify with analysis endpoint
-        # that results are still reasonable
-        request = {
-            "sleep_data": data_dict,
-            "include_metrics": True,
-            "include_patterns": True,
-            "include_stages": True,
-            "user_id": "test-user",
-        }
-
-        analysis_response = client.post("/api/analyze", json=request)
-        assert analysis_response.status_code == 200
-        analysis = analysis_response.json()
-
-        # Even with missing sensors, we should get some sort of analysis
-        assert "overall_metrics" in analysis
-        assert analysis["overall_metrics"] is not None
+    assert result["valid"] is False, "Missing sensor data should fail validation"
+    assert (
+        "accelerometer" in result["reason"].lower()
+    ), "Reason should mention missing accelerometer data"

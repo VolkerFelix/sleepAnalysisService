@@ -3,7 +3,7 @@ from typing import List
 from pydantic import AnyHttpUrl, BaseSettings
 
 
-class Settings(BaseSettings):
+class Settings(BaseSettings):  # type: ignore
     PROJECT_NAME: str = "Areum Sleep Analysis Service"
     VERSION: str = "0.1.0"
     API_PREFIX: str = "/api"
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     MOVEMENT_THRESHOLD: float = 0.15
     DEEP_SLEEP_THRESHOLD: float = 0.1
     REM_SLEEP_THRESHOLD: float = 0.2
-    
+
     # Time thresholds (in minutes)
     MIN_SLEEP_DURATION: int = 60  # Minimum duration to be considered valid sleep
     MIN_SLEEP_STAGE_DURATION: int = 5  # Minimum duration for a sleep stage
