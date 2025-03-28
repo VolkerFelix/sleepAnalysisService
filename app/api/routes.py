@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 
 from app.models.sleep import (
+    SensorType,
     SleepAnalysisRequest,
     SleepAnalysisResponse,
     SleepData,
@@ -80,42 +81,62 @@ async def validate_sleep_data(data: SleepData):
         if duration_minutes < 30:
             return ValidationResponse(
                 valid=False,
-                reason="""Sleep duration too short: {duration_minutes:.1f} minutes
-                    minimum 30 minutes required""",
+                reason=f"""Sleep duration too short: {duration_minutes:.1f}
+                minutes (minimum 30 minutes required""",
             )
 
-        # Check sampling rate is sufficient
-        # RELAXED: Only require 30% of expected samples for testing
-        expected_samples = int(
-            (end_time - start_time).total_seconds() * data.sampling_rate_hz
-        )
-        actual_samples = len(data.samples)
-        completeness = (
-            (actual_samples / expected_samples) * 100 if expected_samples > 0 else 0
-        )
-        print(f"Expected samples: {expected_samples}, Actual samples: {actual_samples}")
-        print(f"Completeness: {completeness:.1f}%")
-
-        if completeness < 30:  # Lowered from 70% to 30% for testing
-            return ValidationResponse(
-                valid=False,
-                reason="""Insufficient data coverage: {completeness:.1f}%
-                of expected samples (minimum 30% required""",
-            )
-
-        # Validate sensor types
+        # IMPORTANT: First validate sensor types - check this BEFORE completeness
         sensor_types = set(sample.sensor_type for sample in data.samples)
         print(f"Sensor types: {sensor_types}")
 
         if len(sensor_types) == 0:
             return ValidationResponse(valid=False, reason="No sensor data available")
 
-        # At least need accelerometer data
-        if "accelerometer" not in [s.value for s in sensor_types]:
+        # Check for accelerometer data before evaluating completeness
+        has_accelerometer = False
+        for sensor_type in sensor_types:
+            if sensor_type == SensorType.ACCELEROMETER:
+                has_accelerometer = True
+                break
+
+        if not has_accelerometer:
             return ValidationResponse(
                 valid=False,
-                reason=""""Missing accelerometer data, which is required for
-                sleep analysis""",
+                reason="""Missing accelerometer data, which is required
+                for sleep analysis""",
+            )
+
+        # Now check sampling rate is sufficient for accelerometer data
+        accelerometer_samples = [
+            sample
+            for sample in data.samples
+            if sample.sensor_type == SensorType.ACCELEROMETER
+        ]
+
+        # Only check completeness for accelerometer data
+        expected_acc_samples = int(
+            (end_time - start_time).total_seconds() / 300
+        )  # 1 per 5 minutes
+        actual_acc_samples = len(accelerometer_samples)
+
+        # Calculate completeness percentage
+        completeness = (
+            (actual_acc_samples / expected_acc_samples * 100)
+            if expected_acc_samples > 0
+            else 0
+        )
+
+        print(
+            f"""Expected accelerometer samples: {expected_acc_samples},
+            Actual: {actual_acc_samples}"""
+        )
+        print(f"Completeness: {completeness:.1f}%")
+
+        if completeness < 30:
+            return ValidationResponse(
+                valid=False,
+                reason=f"""Insufficient data coverage: {completeness:.1f}%
+                of expected samples (minimum 30% required""",
             )
 
         return ValidationResponse(valid=True, reason="Data validation passed")

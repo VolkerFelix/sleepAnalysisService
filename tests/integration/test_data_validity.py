@@ -18,10 +18,11 @@ def create_valid_sleep_data():
     now = datetime.utcnow()
     start_time = now - timedelta(hours=8)  # 8 hours of sleep
 
-    # Set a much lower sampling rate to match our actual sample generation frequency
-    sampling_rate_hz = 1 / 300  # 1 sample per 5 minutes instead of 1 per minute
+    # FIXED: Set a proper sampling rate that matches our actual sample generation
+    # We're generating samples every 5 minutes, so our rate is 1/300 Hz
+    sampling_rate_hz = 1 / 300  # 1 sample per 5 minutes
 
-    # Create samples at intervals matching our declared sampling rate
+    # Generate samples for full 8-hour duration (96 five-minute intervals)
     for i in range(96):  # 96 five-minute intervals in 8 hours
         timestamp = start_time + timedelta(minutes=i * 5)
 
@@ -33,7 +34,12 @@ def create_valid_sleep_data():
         acc_sample = SleepSample(
             timestamp=timestamp,
             sensor_type=SensorType.ACCELEROMETER,
-            values={"x": x, "y": y, "z": z},
+            values={
+                "x": x,
+                "y": y,
+                "z": z,
+                "movement_intensity": 0.1 + 0.05 * random.random(),
+            },
         )
         samples.append(acc_sample)
 
@@ -59,7 +65,7 @@ def create_valid_sleep_data():
     return SleepData(
         data_type="sleep_monitoring",
         device_info={"device_type": "test", "model": "test-device"},
-        sampling_rate_hz=sampling_rate_hz,  # 1 sample per 5 minutes
+        sampling_rate_hz=sampling_rate_hz,  # Consistent with our actual sampling
         start_time=start_time,
         end_time=now,
         samples=samples,
@@ -103,6 +109,7 @@ def create_invalid_sleep_data(issue="short_duration"):
                     "x": 0.1 * math.sin(i / 4) + 0.05 * (random.random() - 0.5),
                     "y": 0.1 * math.cos(i / 5) + 0.05 * (random.random() - 0.5),
                     "z": 0.95 + 0.05 * math.sin(i / 6) + 0.05 * (random.random() - 0.5),
+                    "movement_intensity": 0.1 + 0.05 * random.random(),
                 },
             )
             samples.append(acc_sample)
@@ -131,6 +138,7 @@ def create_invalid_sleep_data(issue="short_duration"):
                     "z": 0.95
                     + 0.05 * math.sin(i / 60)
                     + 0.05 * (random.random() - 0.5),
+                    "movement_intensity": 0.1 + 0.05 * random.random(),
                 },
             )
             samples.append(acc_sample)
@@ -160,6 +168,7 @@ def create_invalid_sleep_data(issue="short_duration"):
                     "x": 0.1 * (random.random() - 0.5),
                     "y": 0.1 * (random.random() - 0.5),
                     "z": 1.0 + 0.1 * (random.random() - 0.5),
+                    "movement_intensity": 0.2 + 0.1 * random.random(),
                 },
             )
             samples.append(acc_sample)
