@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class SleepStageType(str, Enum):
@@ -19,6 +19,7 @@ class SleepQualityLevel(str, Enum):
     FAIR = "fair"
     POOR = "poor"
     VERY_POOR = "very_poor"
+    UNKNOWN = "unknown"
 
 
 class SensorType(str, Enum):
@@ -34,6 +35,7 @@ class SensorType(str, Enum):
 
 class SleepSample(BaseModel):
     """Model for a single sleep data sample."""
+
     timestamp: datetime
     sensor_type: SensorType
     values: Dict[str, float]
@@ -41,6 +43,7 @@ class SleepSample(BaseModel):
 
 class SleepData(BaseModel):
     """Model for a collection of sleep data samples."""
+
     data_type: str
     device_info: Dict[str, Any]
     sampling_rate_hz: int
@@ -53,6 +56,7 @@ class SleepData(BaseModel):
 
 class SleepMetrics(BaseModel):
     """Model for metrics calculated from sleep data."""
+
     total_duration_minutes: float
     sleep_efficiency: float  # Percentage of time actually sleeping
     time_to_fall_asleep_minutes: float  # Sleep latency
@@ -71,6 +75,7 @@ class SleepMetrics(BaseModel):
 
 class SleepStage(BaseModel):
     """Model for a detected sleep stage segment."""
+
     start_time: datetime
     end_time: datetime
     stage_type: SleepStageType
@@ -80,6 +85,7 @@ class SleepStage(BaseModel):
 
 class SleepPattern(BaseModel):
     """Model for sleep patterns detected across multiple stages."""
+
     pattern_type: str  # e.g., "normal", "fragmented", "delayed", "advanced"
     description: str
     total_duration_minutes: float
@@ -89,6 +95,7 @@ class SleepPattern(BaseModel):
 
 class SleepAnalysisRequest(BaseModel):
     """Model for a request to analyze sleep data."""
+
     sleep_data: SleepData
     include_metrics: bool = True
     include_patterns: bool = True
@@ -100,6 +107,7 @@ class SleepAnalysisRequest(BaseModel):
 
 class SleepAnalysisResponse(BaseModel):
     """Model for a response containing sleep analysis results."""
+
     status: str
     message: Optional[str] = None
     sleep_stages: List[SleepStage] = []
