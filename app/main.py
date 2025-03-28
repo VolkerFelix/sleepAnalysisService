@@ -8,7 +8,8 @@ from app.core.config import settings
 def create_application() -> FastAPI:
     application = FastAPI(
         title="Areum Sleep Analysis Service",
-        description="Microservice for analyzing and recognizing sleep patterns from sensor data",
+        description="""Microservice for analyzing and
+        recognizing sleep patterns from sensor data""",
         version=settings.VERSION,
         docs_url="/docs" if settings.SHOW_DOCS else None,
     )
