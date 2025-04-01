@@ -9,3 +9,9 @@ pytest==7.4.3
 black==23.3.0
 isort==5.10.1
 flake8==6.0.0
+transformers>=4.35.0
+accelerate>=0.21.0
+torch>=2.0.0
+sentencepiece>=0.1.99
+psutil>=5.9.0
+python-dotenv==1.0.0

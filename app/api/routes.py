@@ -2,6 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException
 
+from app.models.nlg import SleepNLGResponse
 from app.models.sleep import (
     SensorType,
     SleepAnalysisRequest,
@@ -12,9 +13,11 @@ from app.models.sleep import (
 )
 from app.models.validation import ValidationResponse
 from app.services.analysis import SleepAnalysisService
+from app.services.nlg import SleepNLGService
 
 router = APIRouter()
 sleep_service = SleepAnalysisService()
+nlg_service = SleepNLGService()
 
 
 @router.post("/analyze", response_model=SleepAnalysisResponse)
@@ -26,6 +29,24 @@ async def analyze_sleep(request: SleepAnalysisRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error analyzing sleep data: {str(e)}"
+        )
+
+
+@router.post("/analyze/conversational", response_model=SleepNLGResponse)
+async def analyze_sleep_conversational(request: SleepAnalysisRequest):
+    """Analyze sleep data and return a conversational, human-like response."""
+    try:
+        # First get the analytical results
+        analysis_response = sleep_service.analyze_sleep(request)
+
+        # Then transform to natural language with LLM
+        nlg_response = nlg_service.generate_response(analysis_response, request.user_id)
+
+        return nlg_response
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating conversational sleep analysis: {str(e)}",
         )
 
 
