@@ -12,6 +12,8 @@ This service provides APIs for analyzing sleep data to recognize various sleep s
 - Sleep pattern recognition
 - Sleep quality assessment
 - Health recommendations based on sleep patterns
+- Natural language conversational sleep analysis
+- Personalized sleep insights
 - RESTful API endpoints
 - Health monitoring
 - CORS support
@@ -22,7 +24,10 @@ This service provides APIs for analyzing sleep data to recognize various sleep s
 - FastAPI - Modern web framework for building APIs
 - Pydantic - Data validation using Python type annotations
 - NumPy & Pandas - Data manipulation and analysis
-- Scikit-learn - Machine learning capabilities
+- Scikit-learn - Machine learning for sleep stage detection
+- PyTorch - Deep learning framework for NLG capabilities
+- Hugging Face Transformers - State-of-the-art NLP models
+- Mistral & OPT - Language models for natural sleep analysis
 - Docker support for containerization
 
 ## Prerequisites
@@ -62,6 +67,16 @@ pip install -r requirements.txt
 pre-commit install
 ```
 
+3. Configure NLG settings (optional):
+Create a `.env` file in the project root:
+```
+# Hugging Face authentication for accessing gated models
+HUGGING_FACE_HUB_TOKEN=your_token_here
+
+# NLG settings
+NLG_USE_SMALL_MODEL=False  # Set to True to use smaller model on resource-constrained systems
+```
+
 ## Running the Service
 
 ### Local Development
@@ -90,6 +105,7 @@ Once the service is running, you can access:
 ## API Endpoints
 
 - `POST /api/analyze` - Analyze sleep data to detect stages, patterns, and metrics
+- `POST /api/analyze/conversational` - Get natural language, conversational analysis of sleep data
 - `GET /api/stage_types` - Get all supported sleep stage types
 - `POST /api/metrics` - Calculate sleep metrics from sleep data
 - `POST /api/validate` - Validate sleep data for quality and completeness
@@ -117,6 +133,30 @@ sleepAnalysisService/
 ├── Dockerfile      # Container configuration
 ├── requirements.txt # Python dependencies
 └── pyproject.toml  # Project configuration
+```
+
+## Natural Language Sleep Analysis
+
+The service includes a sophisticated natural language generation component that transforms analytical sleep data into human-like, conversational insights. This feature enables:
+
+- Personalized sleep reports in natural language
+- Context-aware insights that reference previous sleep patterns
+- Empathetic messaging that adapts to sleep quality
+- Actionable recommendations presented in a conversational style
+- Varied response styles that avoid repetitive phrasing
+
+### Using the Conversational API
+
+To get natural language sleep analysis, use the `/api/analyze/conversational` endpoint with the same request format as the standard analysis endpoint. The response includes:
+
+```json
+{
+  "conversational_response": "A complete natural language summary of sleep data",
+  "summary": "A brief overview of the sleep session",
+  "insights": ["Key insight 1", "Key insight 2"],
+  "recommendations": ["Recommendation 1", "Recommendation 2"],
+  "conclusion": "A supportive closing statement"
+}
 ```
 
 ## Sleep Data Format
