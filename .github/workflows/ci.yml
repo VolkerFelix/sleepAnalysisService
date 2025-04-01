@@ -1,0 +1,176 @@
+name: Sleep Analysis Service CI/CD
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8==6.0.0 black==23.3.0 isort==5.10.1
+
+    - name: Run linters
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Check code formatting
+        black --check app tests
+        isort --check-only --profile black app tests
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+
+    - name: Run tests with coverage
+      run: |
+        pytest --cov=app --cov-report=xml
+
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  docker:
+    name: Build and Push Multi-Platform Docker Image
+    needs: [lint, test]  # This job will only run if lint and test jobs succeed
+    runs-on: ubuntu-latest
+
+    # Only run on pushes to main/master or when manually triggered, not on PRs
+    if: >-
+      (github.event_name == 'push' &&
+       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      github.event_name == 'workflow_dispatch'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v3
+
+    # Set up QEMU for cross-platform builds
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+
+    # Set up Docker Buildx with increased memory
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+        driver-opts: |
+          image=moby/buildkit:latest
+          network=host
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Setup Hugging Face credentials for pulling models during build
+    - name: Configure Hugging Face credentials
+      run: |
+        echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> $GITHUB_ENV
+
+    - name: Extract metadata for Docker
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=sha,format=long
+          type=ref,event=branch
+          type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+
+    # Build and push multi-platform image
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          HF_TOKEN=${{ secrets.HF_TOKEN }}
+        # Increase memory limit to handle model downloads
+        outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Sleep Analysis Service with Mistral NLG support
+
+  m4-build:
+    name: M4-Optimized Build (Manual)
+    if: github.event_name == 'workflow_dispatch'
+    needs: [lint, test]  # This job will only run if lint and test jobs succeed
+    runs-on: self-hosted
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Setup Hugging Face credentials
+    - name: Configure Hugging Face credentials
+      run: |
+        echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> $GITHUB_ENV
+
+    # For M4, we build directly without buildx since we're already on the target platform
+    - name: Build and push M4-optimized image
+      run: |
+        # Generate a tag based on commit SHA
+        M4_TAG="m4-$(git rev-parse --short HEAD)"
+
+        # Explicitly set platform for M4
+        docker build \
+          --build-arg HF_TOKEN=${{ secrets.HF_TOKEN }} \
+          --build-arg OPTIMIZE_FOR_M4=true \
+          -t ghcr.io/${{ github.repository }}:${M4_TAG} \
+          -t ghcr.io/${{ github.repository }}:m4-latest \
+          .
+
+        docker push ghcr.io/${{ github.repository }}:${M4_TAG}
+        docker push ghcr.io/${{ github.repository }}:m4-latest
