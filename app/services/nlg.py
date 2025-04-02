@@ -58,10 +58,11 @@ class SleepNLGService:
                         llm_int8_threshold=6.0,
                         llm_int8_has_fp16_weight=False,
                     )
-                    logger.info("Will apply 8-bit quantization.")
+                    logger.info("Will apply BitsAndytes 8-bit quantization.")
                 else:
-                    settings.NLG_USE_SMALL_MODEL = True
-                    logger.warning("Automatically switching to small model.")
+                    logger.info(
+                        "Will run with device_map='auto' and hope for the best."
+                    )
 
                 # If very limited memory, auto-switch to small model mode
                 if available_memory_gb < 8 and not settings.NLG_USE_SMALL_MODEL:
