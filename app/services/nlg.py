@@ -267,27 +267,54 @@ class SleepNLGService:
                 previous_context += f"{i}. {clean_rec}\n"
 
         # Build the complete prompt
-        prompt = f"""<s>[INST] You are a helpful, empathetic sleep coach assistant.
-            Generate a personalized, conversational sleep analysis response
-            based on the following data.
-            Make the response sound natural and human-like, not clinical or robotic.
-            Be empathetic and encouraging.
-            Organize your response with:
-            1. A personalized greeting
-            2. A conversational summary of their sleep
-            3. Key insights about their sleep patterns (2-3 insights)
-            4. Personalized recommendations (2-3)
-            5. A supportive conclusion
+        prompt = ""
+        if "TinyLlama" in self.loaded_model_path:
+            # TinyLlama format
+            prompt = f"""<|user|>
+You are a helpful, empathetic sleep coach assistant.
+Generate a personalized, conversational sleep analysis response
+based on the following data.
+Make the response sound natural and human-like, not clinical or robotic.
+Be empathetic and encouraging.
+Organize your response with:
+1. A personalized greeting
+2. A conversational summary of their sleep
+3. Key insights about their sleep patterns (2-3 insights)
+4. Personalized recommendations (2-3)
+5. A supportive conclusion
 
-            DATA:
-            {metrics_text}
-            {patterns_text}
-            {trend_text}
-            {previous_context}
+DATA:
+{metrics_text}
+{patterns_text}
+{trend_text}
+{previous_context}
 
-            Now generate a conversational sleep analysis that sounds like
-            it's from a knowledgeable sleep coach: [/INST]</s>
-            """
+Now generate a conversational sleep analysis that sounds like
+it's from a knowledgeable sleep coach:
+<|assistant|>"""
+        else:
+            # Mistral format (default)
+            prompt = f"""<s>[INST] You are a helpful, empathetic sleep coach assistant.
+Generate a personalized, conversational sleep analysis response
+based on the following data.
+Make the response sound natural and human-like, not clinical or robotic.
+Be empathetic and encouraging.
+Organize your response with:
+1. A personalized greeting
+2. A conversational summary of their sleep
+3. Key insights about their sleep patterns (2-3 insights)
+4. Personalized recommendations (2-3)
+5. A supportive conclusion
+
+DATA:
+{metrics_text}
+{patterns_text}
+{trend_text}
+{previous_context}
+
+Now generate a conversational sleep analysis that sounds like
+it's from a knowledgeable sleep coach: [/INST]</s>
+"""
         return prompt
 
     def _generate_from_model(self, prompt: str) -> str:
