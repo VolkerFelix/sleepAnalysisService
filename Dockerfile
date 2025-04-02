@@ -19,7 +19,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HF_HUB_CACHE=/app/.cache/huggingface \
     HF_DATASETS_CACHE=/app/.cache/huggingface/datasets \
-    TRANSFORMERS_CACHE=/app/.cache/huggingface/transformers
+    TRANSFORMERS_CACHE=/app/.cache/huggingface/transformers \
+    PATH="/home/app/.local/bin:${PATH}"
 
 # Create a non-root user to run the app
 RUN useradd -m -u 1000 app
@@ -44,12 +45,6 @@ RUN pip install --no-cache-dir accelerate && \
 # Copy the application code
 COPY --chown=app:app . .
 
-# Expose port
-EXPOSE 8000
-
-# Run the application with optimized settings
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
-
 # For local development on CUDA-capable machines, build with:
 # docker build --target cuda -t sleep-analysis-service:cuda .
 FROM base AS cuda
@@ -64,4 +59,15 @@ FROM base AS apple-silicon
 
 # Install PyTorch for Apple Silicon
 USER app
-RUN pip install --no-cache-dir --force-reinstall torch torchvision torchaudio
+RUN pip install --user --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    torch==2.0.0 \
+    torchvision==0.15.0 \
+    torchaudio==2.0.0
+
+# Expose port
+EXPOSE 8000
+
+# Run the application with optimized settings
+ENTRYPOINT ["/home/app/.local/bin/uvicorn"]
+CMD ["app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
