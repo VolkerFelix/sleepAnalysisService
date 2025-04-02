@@ -64,22 +64,6 @@ done
 
 echo -e "${YELLOW}Building Docker image for Apple Silicon...${NC}"
 
-# Check if Hugging Face token is set
-HF_TOKEN=""
-if [ -f ".env" ]; then
-    source <(grep -v '^#' .env | sed -E 's/(.*)=.*/export \1/g')
-    HF_TOKEN=$(grep HUGGING_FACE_HUB_TOKEN .env | cut -d '=' -f2)
-fi
-
-BUILD_ARGS=""
-if [ ! -z "$HF_TOKEN" ]; then
-    BUILD_ARGS="--build-arg HUGGING_FACE_HUB_TOKEN=$HF_TOKEN"
-    echo -e "${GREEN}Found Hugging Face token in .env file.${NC}"
-else
-    echo -e "${YELLOW}No Hugging Face token found. Models requiring authentication won't be available.${NC}"
-    echo -e "${YELLOW}Consider adding HUGGING_FACE_HUB_TOKEN=your_token to your .env file.${NC}"
-fi
-
 # Build the Docker image
 BUILD_CMD="docker build --platform=linux/arm64 --target apple-silicon"
 
