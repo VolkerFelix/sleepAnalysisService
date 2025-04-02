@@ -1,12 +1,12 @@
 import logging
 import os
-import platform
 from datetime import datetime
 from typing import Dict
 
+import psutil
 import torch
 from huggingface_hub import login
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from app.core.config import settings
 from app.models.nlg import SleepNLGResponse, UserSleepContext
@@ -19,22 +19,9 @@ class SleepNLGService:
     """Service for generating natural language responses from sleep analysis data."""
 
     def __init__(self):
-        # Detect Apple Silicon
-        self.is_apple_silicon = (
-            platform.system() == "Darwin" and platform.machine() == "arm64"
-        )
-
-        # Set appropriate device
-        if torch.backends.mps.is_available() and self.is_apple_silicon:
-            self.device = "mps"  # Metal Performance Shaders for Apple Silicon
-        elif torch.cuda.is_available():
-            self.device = "cuda"
-        else:
-            self.device = "cpu"
-
-        logger.info(f"Using device: {self.device}")
-
-        # Check available memory and recommend lightweight mode if needed
+        self.device = None
+        self._detect_device()
+        self.quantization_config = None
         self._check_system_resources()
 
         self.model_name = settings.NLG_MODEL_PATH
@@ -43,21 +30,34 @@ class SleepNLGService:
         self.user_contexts: Dict[str, UserSleepContext] = {}  # In-memory store for demo
         self._load_model()
 
+    def _detect_device(self):
+        """Detect HW accelerators"""
+        if torch.backends.mps.is_available():
+            self.device = "mps"  # Metal Performance Shaders for Apple Silicon
+        elif torch.cuda.is_available():
+            self.device = "cuda"
+        else:
+            self.device = "cpu"
+
+        logger.info(f"Using device: {self.device}")
+
     def _check_system_resources(self):
         """Check if the system has enough resources for the full model."""
         try:
-            import psutil
-
-            # Get available system memory in GB
             available_memory_gb = psutil.virtual_memory().available / (1024**3)
             logger.info(f"Available system memory: {available_memory_gb:.2f} GB")
-
             # For Mistral 7B, recommend at least 16GB of available memory
             if available_memory_gb < 16:
                 logger.warning(
                     f"Limited memory available ({available_memory_gb:.2f} GB). "
                     "Consider setting NLG_USE_SMALL_MODEL=True in settings."
                 )
+                self.quantization_config = BitsAndBytesConfig(
+                    load_in_8bit=True,
+                    llm_int8_threshold=6.0,
+                    llm_int8_has_fp16_weight=False,
+                )
+                logger.info("Will apply 8-bit quantization.")
 
                 # If very limited memory, auto-switch to small model mode
                 if available_memory_gb < 8 and not settings.NLG_USE_SMALL_MODEL:
@@ -107,35 +107,21 @@ class SleepNLGService:
             # Load tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
 
-            # Set appropriate loading parameters based on platform and model size
-            if settings.NLG_USE_SMALL_MODEL:
-                # Smaller model uses less memory
+            try:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
-                    torch_dtype=torch.float16
-                    if self.device != "cpu"
-                    else torch.float32,
+                    quantization_config=self.quantization_config,
+                    torch_dtype=torch.float16,
                     device_map="auto",
                 )
-            elif self.is_apple_silicon:
-                # Attempt with reduced precision for Apple Silicon
-                try:
-                    # Try loading with device_map="auto" first
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_path, torch_dtype=torch.float16, device_map="auto"
-                    )
-                except (RuntimeError, ValueError, MemoryError) as e:
-                    logger.warning(
-                        f"Error loading full model: {str(e)}. Trying smaller model..."
-                    )
-                    # Fall back to the smaller model
-                    model_path = settings.NLG_FALLBACK_MODEL_PATH
-                    self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_path, torch_dtype=torch.float16, device_map="auto"
-                    )
-            else:
-                # For other platforms
+
+            except (RuntimeError, ValueError, MemoryError) as e:
+                logger.warning(
+                    f"Error loading full model: {str(e)}. Trying smaller model..."
+                )
+                # Fall back to the smaller model
+                model_path = settings.NLG_FALLBACK_MODEL_PATH
+                self.tokenizer = AutoTokenizer.from_pretrained(model_path)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path, torch_dtype=torch.float16, device_map="auto"
                 )
