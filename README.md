@@ -89,12 +89,42 @@ The service will be available at `http://localhost:8000`
 
 ### Docker
 
-Build and run using Docker:
+The service can be deployed using Docker with hardware acceleration support for different platforms.
+
+#### Basic Build (CPU only)
 
 ```bash
 docker build -t sleep-analysis-service .
 docker run -p 8000:8000 sleep-analysis-service
 ```
+
+#### CUDA-enabled Build (for NVIDIA GPUs)
+
+```bash
+docker build --target cuda -t sleep-analysis-service:cuda .
+docker run --gpus all -p 8000:8000 sleep-analysis-service:cuda
+```
+
+#### Apple Silicon Build (for M1/M2 Macs)
+
+```bash
+docker build --target apple-silicon --platform=linux/arm64 -t sleep-analysis-service:apple .
+docker run -p 8000:8000 sleep-analysis-service:apple
+```
+
+#### Multi-platform Build (CI/CD)
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 -t sleep-analysis-service:multi .
+```
+
+## Hardware Acceleration
+
+The service is optimized to use:
+- NVIDIA CUDA for GPU acceleration on compatible hardware
+- Apple Metal Performance Shaders (MPS) on Apple Silicon Macs
+
+This significantly improves the performance of ML models, especially for natural language generation using the Mistral 7B model.
 
 ## API Documentation
 
@@ -187,6 +217,17 @@ The service accepts sleep data in the following format:
   ]
 }
 ```
+
+## Performance Considerations
+
+The natural language generation component uses the Mistral 7B model, which requires significant computational resources:
+
+- At least 16GB of RAM for optimal performance
+- GPU acceleration highly recommended for production use
+- Apple Silicon Macs benefit from MPS acceleration
+- The service automatically falls back to a smaller model on resource-constrained systems
+
+You can configure `NLG_USE_SMALL_MODEL=True` in your `.env` file to always use the smaller model.
 
 ## Contributing
 
