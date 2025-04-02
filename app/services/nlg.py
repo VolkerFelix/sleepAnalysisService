@@ -52,12 +52,16 @@ class SleepNLGService:
                     f"Limited memory available ({available_memory_gb:.2f} GB). "
                     "Consider setting NLG_USE_SMALL_MODEL=True in settings."
                 )
-                self.quantization_config = BitsAndBytesConfig(
-                    load_in_8bit=True,
-                    llm_int8_threshold=6.0,
-                    llm_int8_has_fp16_weight=False,
-                )
-                logger.info("Will apply 8-bit quantization.")
+                if self.device == "cuda":
+                    self.quantization_config = BitsAndBytesConfig(
+                        load_in_8bit=True,
+                        llm_int8_threshold=6.0,
+                        llm_int8_has_fp16_weight=False,
+                    )
+                    logger.info("Will apply 8-bit quantization.")
+                else:
+                    settings.NLG_USE_SMALL_MODEL = True
+                    logger.warning("Automatically switching to small model.")
 
                 # If very limited memory, auto-switch to small model mode
                 if available_memory_gb < 8 and not settings.NLG_USE_SMALL_MODEL:

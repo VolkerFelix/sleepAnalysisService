@@ -39,8 +39,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Install additional ML dependencies that don't require CUDA compilation
-RUN pip install --no-cache-dir accelerate && \
-    pip install --no-cache-dir "bitsandbytes<0.41.0" || echo "bitsandbytes installation skipped"
+RUN pip install --no-cache-dir accelerate
 
 # Copy the application code
 COPY --chown=app:app . .
@@ -61,9 +60,7 @@ FROM base AS apple-silicon
 USER app
 RUN pip install --user --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cpu \
-    torch==2.0.0 \
-    torchvision==0.15.0 \
-    torchaudio==2.0.0
+    torch==2.6.0
 
 # Expose port
 EXPOSE 8000

@@ -12,8 +12,8 @@ class Settings(BaseSettings):  # type: ignore
     ML_MODEL_PATH: str = "app/models/trained/sleep_model.joblib"
     HUGGING_FACE_HUB_TOKEN: str = ""
     NLG_MODEL_PATH: str = "mistralai/Mistral-7B-Instruct-v0.2"
-    NLG_FALLBACK_MODEL_PATH: str = "google/flan-t5-base"  # Smaller fallback model
-    NLG_USE_SMALL_MODEL: bool = False  # Set to True to use the smaller model instead
+    NLG_FALLBACK_MODEL_PATH: str = ""
+    NLG_USE_SMALL_MODEL: bool = False
     NLG_ENABLED: bool = True
 
     # Threshold settings for sleep detection
